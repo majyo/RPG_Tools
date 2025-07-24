@@ -10,18 +10,20 @@ namespace RPGTools.UI
     /// </summary>
     public class UIResourceLoader : MonoBehaviour
     {
-        private static UIResourceLoader instance;
+        private static UIResourceLoader _instance;
         public static UIResourceLoader Instance
         {
             get
             {
-                if (instance == null)
+                if (_instance != null)
                 {
-                    GameObject go = new GameObject("UIResourceLoader");
-                    instance = go.AddComponent<UIResourceLoader>();
-                    DontDestroyOnLoad(go);
+                    return _instance;
                 }
-                return instance;
+                
+                var go = new GameObject("UIResourceLoader");
+                _instance = go.AddComponent<UIResourceLoader>();
+                DontDestroyOnLoad(go);
+                return _instance;
             }
         }
 

@@ -9,18 +9,20 @@ namespace RPGTools.UI
     /// </summary>
     public class UIManager : MonoBehaviour
     {
-        private static UIManager instance;
+        private static UIManager _instance;
         public static UIManager Instance
         {
             get
             {
-                if (instance == null)
+                if (_instance != null)
                 {
-                    GameObject go = new GameObject("UIManager");
-                    instance = go.AddComponent<UIManager>();
-                    DontDestroyOnLoad(go);
+                    return _instance;
                 }
-                return instance;
+                
+                var go = new GameObject("UIManager");
+                _instance = go.AddComponent<UIManager>();
+                DontDestroyOnLoad(go);
+                return _instance;
             }
         }
 
@@ -34,27 +36,27 @@ namespace RPGTools.UI
         /// <summary>
         /// 已打开的面板字典
         /// </summary>
-        private Dictionary<UIPanelType, UIPanel> openedPanels = new Dictionary<UIPanelType, UIPanel>();
+        private readonly Dictionary<UIPanelType, UIPanel> _openedPanels = new();
 
         /// <summary>
         /// 面板实例缓存
         /// </summary>
-        private Dictionary<UIPanelType, UIPanel> panelCache = new Dictionary<UIPanelType, UIPanel>();
+        private readonly Dictionary<UIPanelType, UIPanel> _panelCache = new();
 
         /// <summary>
         /// 当前排序顺序
         /// </summary>
-        private Dictionary<UILayer, int> currentSortingOrder = new Dictionary<UILayer, int>();
+        private readonly Dictionary<UILayer, int> _currentSortingOrder = new();
 
         private void Awake()
         {
-            if (instance == null)
+            if (_instance == null)
             {
-                instance = this;
+                _instance = this;
                 DontDestroyOnLoad(gameObject);
                 InitializeLayers();
             }
-            else if (instance != this)
+            else if (_instance != this)
             {
                 Destroy(gameObject);
             }
@@ -68,7 +70,7 @@ namespace RPGTools.UI
             // 如果没有指定Canvas，创建一个
             if (uiCanvas == null)
             {
-                GameObject canvasGO = new GameObject("UICanvas");
+                var canvasGO = new GameObject("UICanvas");
                 canvasGO.transform.SetParent(transform);
                 uiCanvas = canvasGO.AddComponent<Canvas>();
                 uiCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -83,10 +85,10 @@ namespace RPGTools.UI
             CreateLayerIfNotExists(ref systemLayer, "SystemLayer");
 
             // 初始化排序顺序
-            currentSortingOrder[UILayer.Background] = (int)UILayer.Background;
-            currentSortingOrder[UILayer.Normal] = (int)UILayer.Normal;
-            currentSortingOrder[UILayer.Top] = (int)UILayer.Top;
-            currentSortingOrder[UILayer.System] = (int)UILayer.System;
+            _currentSortingOrder[UILayer.Background] = (int)UILayer.Background;
+            _currentSortingOrder[UILayer.Normal] = (int)UILayer.Normal;
+            _currentSortingOrder[UILayer.Top] = (int)UILayer.Top;
+            _currentSortingOrder[UILayer.System] = (int)UILayer.System;
         }
 
         /// <summary>
@@ -94,19 +96,21 @@ namespace RPGTools.UI
         /// </summary>
         private void CreateLayerIfNotExists(ref Transform layer, string layerName)
         {
-            if (layer == null)
+            if (layer != null)
             {
-                GameObject layerGO = new GameObject(layerName);
-                layerGO.transform.SetParent(uiCanvas.transform, false);
-                layer = layerGO.transform;
-
-                // 添加RectTransform并设置为全屏
-                RectTransform rect = layerGO.AddComponent<RectTransform>();
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = Vector2.one;
-                rect.sizeDelta = Vector2.zero;
-                rect.anchoredPosition = Vector2.zero;
+                return;
             }
+            
+            var layerGO = new GameObject(layerName);
+            layerGO.transform.SetParent(uiCanvas.transform, false);
+            layer = layerGO.transform;
+
+            // 添加RectTransform并设置为全屏
+            var rect = layerGO.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.sizeDelta = Vector2.zero;
+            rect.anchoredPosition = Vector2.zero;
         }
 
         /// <summary>
@@ -124,29 +128,29 @@ namespace RPGTools.UI
             }
 
             // 如果面板已经打开，直接返回
-            if (openedPanels.ContainsKey(panelType))
+            if (_openedPanels.TryGetValue(panelType, out var openedPanel))
             {
                 Debug.LogWarning($"Panel {panelType} is already opened");
-                onComplete?.Invoke(openedPanels[panelType]);
+                onComplete?.Invoke(openedPanel);
                 return;
             }
 
             // 获取面板配置信息
-            if (!UIConfig.PanelInfoDict.TryGetValue(panelType, out UIPanelInfo panelInfo))
+            if (!UIConfig.PanelInfoDict.TryGetValue(panelType, out var panelInfo))
             {
                 Debug.LogError($"Panel info not found for type: {panelType}");
                 return;
             }
 
             // 检查缓存中是否有面板实例
-            if (panelCache.TryGetValue(panelType, out UIPanel cachedPanel))
+            if (_panelCache.TryGetValue(panelType, out var cachedPanel))
             {
                 ShowPanel(cachedPanel, data, onComplete);
                 return;
             }
 
             // 异步加载面板
-            UIResourceLoader.Instance.LoadUIPrefabAsync(panelInfo.prefabPath, (GameObject prefabInstance) =>
+            UIResourceLoader.Instance.LoadUIPrefabAsync(panelInfo.prefabPath, prefabInstance =>
             {
                 if (prefabInstance == null)
                 {
@@ -154,7 +158,7 @@ namespace RPGTools.UI
                     return;
                 }
 
-                UIPanel panel = prefabInstance.GetComponent<UIPanel>();
+                var panel = prefabInstance.GetComponent<UIPanel>();
                 if (panel == null)
                 {
                     Debug.LogError($"Prefab {panelInfo.prefabPath} does not have UIPanel component");
@@ -177,7 +181,7 @@ namespace RPGTools.UI
                 // 缓存面板（如果不是销毁类型）
                 if (!panelInfo.isDestroyOnClose)
                 {
-                    panelCache[panelType] = panel;
+                    _panelCache[panelType] = panel;
                 }
 
                 // 注册事件
@@ -192,7 +196,7 @@ namespace RPGTools.UI
         /// </summary>
         private void ShowPanel(UIPanel panel, object data, Action<UIPanel> onComplete)
         {
-            openedPanels[panel.panelType] = panel;
+            _openedPanels[panel.panelType] = panel;
             panel.Open(data);
             onComplete?.Invoke(panel);
         }
@@ -203,7 +207,7 @@ namespace RPGTools.UI
         /// <param name="panelType">面板类型</param>
         public void ClosePanel(UIPanelType panelType)
         {
-            if (openedPanels.TryGetValue(panelType, out UIPanel panel))
+            if (_openedPanels.TryGetValue(panelType, out var panel))
             {
                 panel.Close();
             }
@@ -218,7 +222,7 @@ namespace RPGTools.UI
         /// </summary>
         public void CloseAllPanels()
         {
-            List<UIPanelType> panelsToClose = new List<UIPanelType>(openedPanels.Keys);
+            List<UIPanelType> panelsToClose = new List<UIPanelType>(_openedPanels.Keys);
             foreach (UIPanelType panelType in panelsToClose)
             {
                 ClosePanel(panelType);
@@ -232,7 +236,7 @@ namespace RPGTools.UI
         /// <returns>面板实例，如果未打开返回null</returns>
         public UIPanel GetOpenedPanel(UIPanelType panelType)
         {
-            return openedPanels.TryGetValue(panelType, out UIPanel panel) ? panel : null;
+            return _openedPanels.GetValueOrDefault(panelType);
         }
 
         /// <summary>
@@ -242,7 +246,7 @@ namespace RPGTools.UI
         /// <returns>是否已打开</returns>
         public bool IsPanelOpened(UIPanelType panelType)
         {
-            return openedPanels.ContainsKey(panelType);
+            return _openedPanels.ContainsKey(panelType);
         }
 
         /// <summary>
@@ -250,12 +254,12 @@ namespace RPGTools.UI
         /// </summary>
         private void OnPanelClosed(UIPanel panel)
         {
-            openedPanels.Remove(panel.panelType);
+            _openedPanels.Remove(panel.panelType);
 
             // 如果是销毁类型的面板，从缓存中移除并销毁
             if (UIConfig.PanelInfoDict.TryGetValue(panel.panelType, out UIPanelInfo panelInfo) && panelInfo.isDestroyOnClose)
             {
-                panelCache.Remove(panel.panelType);
+                _panelCache.Remove(panel.panelType);
                 panel.DestroyPanel();
             }
         }
@@ -280,8 +284,8 @@ namespace RPGTools.UI
         /// </summary>
         private int GetNextSortingOrder(UILayer layer)
         {
-            currentSortingOrder[layer]++;
-            return currentSortingOrder[layer];
+            _currentSortingOrder[layer]++;
+            return _currentSortingOrder[layer];
         }
 
         /// <summary>
@@ -289,14 +293,14 @@ namespace RPGTools.UI
         /// </summary>
         public void ClearCache()
         {
-            foreach (var panel in panelCache.Values)
+            foreach (var panel in _panelCache.Values)
             {
                 if (panel != null)
                 {
                     panel.DestroyPanel();
                 }
             }
-            panelCache.Clear();
+            _panelCache.Clear();
             UIResourceLoader.Instance.UnloadUnusedAssets();
         }
     }
